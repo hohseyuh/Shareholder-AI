@@ -1,118 +1,81 @@
 package com.hohseyuh.mcai;
 
+import com.hohseyuh.mcai.ai.NpcJob;
 import com.hohseyuh.mcai.entity.ModEntities;
 import com.hohseyuh.mcai.entity.custom.SimpleNpcEntity;
 import net.fabricmc.api.ModInitializer;
 import net.fabricmc.fabric.api.message.v1.ServerMessageEvents;
 import net.fabricmc.fabric.api.object.builder.v1.entity.FabricDefaultAttributeRegistry;
-import net.minecraft.text.Text;
 import net.minecraft.util.math.Box;
 
 import java.util.List;
-import java.util.Timer;
-import java.util.TimerTask;
 
 public class Mcai implements ModInitializer {
     public static final String MOD_ID = "mcai";
 
     @Override
     public void onInitialize() {
-        // 1. Register the Entity Type
         ModEntities.registerModEntities();
-
-        // 2. Register the Entity Attributes
         FabricDefaultAttributeRegistry.register(ModEntities.SIMPLE_NPC, SimpleNpcEntity.createNpcAttributes());
 
-        // Chat Event Listener
         ServerMessageEvents.CHAT_MESSAGE.register((message, sender, params) -> {
             if (sender == null)
                 return;
 
-            String content = message.getContent().getString();
-            Box box = sender.getBoundingBox().expand(10.0);
+            sender.getServer().execute(() -> {
+                String content = message.getContent().getString();
+                Box box = sender.getBoundingBox().expand(10.0);
+                List<SimpleNpcEntity> npcs = sender.getWorld().getEntitiesByClass(SimpleNpcEntity.class, box,
+                        e -> true);
+                if (npcs.isEmpty())
+                    return;
 
-            // Get all NPCs near the player
-            List<SimpleNpcEntity> npcs = sender.getWorld().getEntitiesByClass(SimpleNpcEntity.class, box,
-                    entity -> true);
+                String lower = content.toLowerCase().trim();
 
-            // If no NPCs nearby, ignore
-            if (npcs.isEmpty())
-                return;
+                // COMMANDS
+                if (lower.contains("follow")) {
+                    npcs.forEach(npc -> {
+                        npc.setFollowTarget(sender);
+                        npc.sendMessage("GELIOM!");
+                    });
+                    return;
+                }
+                if (lower.contains("stop") || lower.contains("stay")) {
+                    npcs.forEach(npc -> {
+                        npc.setFollowTarget(null);
+                        npc.getNavigation().stop();
+                        npc.sendMessage("tamam.");
+                    });
+                    return;
+                }
 
-            String lowerContent = content.toLowerCase().trim();
+                // Job Commands
+                if (lower.contains("job miner") || lower.contains("work mine")) {
+                    npcs.forEach(npc -> npc.setJob(NpcJob.MINER));
+                    return;
+                }
+                if (lower.contains("job none") || lower.contains("stop work")) {
+                    npcs.forEach(npc -> npc.setJob(NpcJob.NONE));
+                    return;
+                }
 
-            // --- MINING COMMANDS ---
-            if (lowerContent.contains("stop mining")) {
+                // Action Commands
+                if (lower.contains("unequip") || lower.contains("give pickaxe")) {
+                    npcs.forEach(npc -> npc.commandUnequip(sender));
+                    return;
+                }
+                if (lower.contains("give loot") || lower.contains("stash")) {
+                    npcs.forEach(npc -> npc.commandDropLoot(sender));
+                    return;
+                }
+
+                // Echo
                 for (SimpleNpcEntity npc : npcs) {
-                    npc.stopMining();
-                    String npcName = getNpcName(npc);
-                    broadcast(sender, "<" + npcName + "> Okay, stopping mining.");
+                    npc.getNavigation().stop();
+                    npc.getLookControl().lookAt(sender);
+                    npc.setDelayedMessage("baba arama beni bu konulardan dolayi ya", 40);
                 }
-                return;
-            } else if (lowerContent.contains("start mining")) {
-                for (SimpleNpcEntity npc : npcs) {
-                    npc.startMining();
-                    String npcName = getNpcName(npc);
-                    broadcast(sender, "<" + npcName + "> Searching for ores...");
-                }
-                return;
-            }
-
-            // --- FOLLOW COMMANDS ---
-            if (lowerContent.contains("follow me")) {
-                for (SimpleNpcEntity npc : npcs) {
-                    npc.setFollowTarget(sender);
-                    String npcName = getNpcName(npc);
-                    broadcast(sender, "<" + npcName + "> Coming!");
-                }
-                return;
-            } else if (lowerContent.contains("stop following") || lowerContent.contains("stay here")) {
-                for (SimpleNpcEntity npc : npcs) {
-                    npc.setFollowTarget(null);
-                    npc.stopMining();
-                    npc.getNavigation().stop(); // Force stop immediately
-
-                    String npcName = getNpcName(npc);
-                    broadcast(sender, "<" + npcName + "> I'll stay here.");
-                }
-                return;
-            }
-
-            // --- CHAT / TALKING ---
-            // Make NPCs look at player and stop moving while "processing" the message
-            for (SimpleNpcEntity npc : npcs) {
-                npc.getNavigation().stop();
-                npc.getLookControl().lookAt(sender);
-            }
-
-            // Delayed Echo (Simulating thinking time)
-            new Timer().schedule(new TimerTask() {
-                @Override
-                public void run() {
-                    // Must run back on the Main Server Thread
-                    if (sender.getServer() != null) {
-                        sender.getServer().execute(() -> {
-                            for (SimpleNpcEntity npc : npcs) {
-                                // Double check NPC is still alive
-                                if (npc.isAlive()) {
-                                    String npcName = getNpcName(npc);
-                                    broadcast(sender, "<" + npcName + "> " + content);
-                                }
-                            }
-                        });
-                    }
-                }
-            }, 2000); // 2 seconds delay
+            });
         });
-    }
-
-    // Helper to avoid repeating name logic
-    private String getNpcName(SimpleNpcEntity npc) {
-        return npc.getCustomName() != null ? npc.getCustomName().getString() : "NPC";
-    }
-
-    // Helper to send message to everyone
-    private void broadcast(net.minecraft.server.network.ServerPlayerEntity sender, String message) {
-        sender.getServer().getPlayerManager().broadcast(Text.literal(message), false);
     }
 }
