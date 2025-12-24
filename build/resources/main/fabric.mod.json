@@ -1,0 +1,35 @@
+{
+  "schemaVersion": 1,
+  "id": "mcai",
+  "version": "1.0-SNAPSHOT",
+  "name": "mcai",
+  "description": "",
+  "authors": [],
+  "contact": {},
+  "license": "All-Rights-Reserved",
+  "icon": "assets/mcai/icon.png",
+  "environment": "*",
+  "entrypoints": {
+    "fabric-datagen": [
+      "com.hohseyuh.mcai.client.McaiDataGenerator"
+    ],
+    "client": [
+      "com.hohseyuh.mcai.client.McaiClient"
+    ],
+    "main": [
+      "com.hohseyuh.mcai.Mcai"
+    ]
+  },
+  "mixins": [
+    "mcai.mixins.json",
+    {
+      "config": "mcai.client.mixins.json",
+      "environment": "client"
+    }
+  ],
+  "depends": {
+    "fabricloader": ">=0.15.11",
+    "fabric-api": "*",
+    "minecraft": "1.21.1"
+  }
+}
