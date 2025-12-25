@@ -1,6 +1,7 @@
 package com.hohseyuh.mcai.ai;
 
 import com.hohseyuh.mcai.entity.custom.SimpleNpcEntity;
+import net.minecraft.entity.EquipmentSlot;
 import net.minecraft.entity.LivingEntity;
 import net.minecraft.entity.ai.goal.Goal;
 import net.minecraft.item.ItemStack;
@@ -171,7 +172,7 @@ public class NpcMeleeAttackGoal extends Goal {
             }
             
             // Equip the sword
-            npc.equipStack(net.minecraft.entity.EquipmentSlot.MAINHAND, bestSword);
+            npc.equipStack(EquipmentSlot.MAINHAND, bestSword);
             npc.getInventory().setStack(bestSwordSlot, ItemStack.EMPTY);
             npc.sendMessage("Drawing " + bestSword.getName().getString() + "!");
         }
