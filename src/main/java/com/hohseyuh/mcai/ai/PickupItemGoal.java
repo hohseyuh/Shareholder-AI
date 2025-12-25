@@ -127,6 +127,11 @@ public class PickupItemGoal extends Goal {
             shouldEquip = true;
         }
 
+        // Auto-Equip Logic for Guard
+        if (npc.getJob() == NpcJob.GUARD && stack.getItem() instanceof net.minecraft.item.SwordItem) {
+            shouldEquip = true;
+        }
+
         if (shouldEquip) {
             if (!currentHand.isEmpty())
                 npc.getInventory().addStack(currentHand);
