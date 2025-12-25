@@ -3,6 +3,7 @@ package com.hohseyuh.mcai.ai;
 import com.hohseyuh.mcai.entity.custom.SimpleNpcEntity;
 import net.minecraft.entity.LivingEntity;
 import net.minecraft.entity.ai.goal.Goal;
+import net.minecraft.item.ItemStack;
 
 import java.util.EnumSet;
 
@@ -52,6 +53,9 @@ public class NpcMeleeAttackGoal extends Goal {
         this.ticksUntilNextPathRecalculation = 0;
         this.attackCooldown = 0;
         this.failedPathAttempts = 0;
+        
+        // Equip a sword from inventory if not already holding one
+        equipBestSword();
     }
 
     @Override
@@ -130,5 +134,55 @@ public class NpcMeleeAttackGoal extends Goal {
         // More generous reach (2.5 blocks instead of vanilla's ~2)
         float reach = npc.getWidth() * 2.5F + target.getWidth();
         return reach * reach;
+    }
+
+    /**
+     * Equips the best sword from inventory when starting combat
+     */
+    private void equipBestSword() {
+        ItemStack mainHand = npc.getMainHandStack();
+        
+        // If already holding a sword, no need to change
+        if (mainHand.getItem() instanceof net.minecraft.item.SwordItem) {
+            return;
+        }
+        
+        // Search inventory for the best sword
+        ItemStack bestSword = ItemStack.EMPTY;
+        int bestSwordSlot = -1;
+        
+        for (int i = 0; i < npc.getInventory().size(); i++) {
+            ItemStack stack = npc.getInventory().getStack(i);
+            if (stack.getItem() instanceof net.minecraft.item.SwordItem) {
+                if (bestSword.isEmpty() || isStrongerWeapon(stack, bestSword)) {
+                    bestSword = stack;
+                    bestSwordSlot = i;
+                }
+            }
+        }
+        
+        // Equip the best sword found
+        if (!bestSword.isEmpty()) {
+            // Store current main hand item in inventory if not empty
+            if (!mainHand.isEmpty()) {
+                npc.getInventory().addStack(mainHand);
+            }
+            
+            // Equip the sword
+            npc.equipStack(net.minecraft.entity.EquipmentSlot.MAINHAND, bestSword);
+            npc.getInventory().setStack(bestSwordSlot, ItemStack.EMPTY);
+            npc.sendMessage("Drawing " + bestSword.getName().getString() + "!");
+        }
+    }
+    
+    /**
+     * Compare weapon strength based on attack damage
+     */
+    private boolean isStrongerWeapon(ItemStack newWeapon, ItemStack currentWeapon) {
+        if (!(newWeapon.getItem() instanceof net.minecraft.item.SwordItem newSword)) return false;
+        if (!(currentWeapon.getItem() instanceof net.minecraft.item.SwordItem currentSword)) return true;
+        
+        // Compare by material tier (diamond > iron > stone > wood)
+        return newSword.getMaterial().getAttackDamage() > currentSword.getMaterial().getAttackDamage();
     }
 }
