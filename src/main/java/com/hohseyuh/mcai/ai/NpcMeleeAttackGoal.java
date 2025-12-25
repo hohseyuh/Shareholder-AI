@@ -54,8 +54,10 @@ public class NpcMeleeAttackGoal extends Goal {
         this.attackCooldown = 0;
         this.failedPathAttempts = 0;
         
-        // Equip a sword from inventory if not already holding one
-        equipBestSword();
+        // Equip a sword from inventory if not already holding one (Guards only)
+        if (npc.getJob() == NpcJob.GUARD) {
+            equipBestSword();
+        }
     }
 
     @Override
