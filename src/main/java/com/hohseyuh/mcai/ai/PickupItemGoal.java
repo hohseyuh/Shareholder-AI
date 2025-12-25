@@ -88,6 +88,24 @@ public class PickupItemGoal extends Goal {
                 }
             }
 
+            // RULE 2: GUARD JOB (New!)
+            else if (npc.getJob() == NpcJob.GUARD) {
+                // A. Swords
+                if (stack.getItem() instanceof net.minecraft.item.SwordItem) {
+                    // Grab if we have no sword, or this one is stronger (using MinerLevel logic as
+                    // a proxy for tier)
+                    ItemStack current = npc.getMainHandStack();
+                    if (current.isEmpty() || !(current.getItem() instanceof net.minecraft.item.SwordItem)
+                            || MinerLevel.isStronger(stack.getItem(), current.getItem())) {
+                        isInteresting = true;
+                    }
+                }
+                // B. Armor (Simple check: is it an armor item?)
+                else if (stack.getItem() instanceof net.minecraft.item.ArmorItem) {
+                    isInteresting = true;
+                }
+            }
+
             if (isInteresting) {
                 double distSq = npc.squaredDistanceTo(item);
                 if (distSq < closestDistSq) {
@@ -114,6 +132,17 @@ public class PickupItemGoal extends Goal {
                 npc.getInventory().addStack(currentHand);
             npc.equipStack(EquipmentSlot.MAINHAND, stack);
             npc.sendMessage("Equipping " + stack.getName().getString());
+        }
+        // Auto-Equip Armor
+        else if (stack.getItem() instanceof net.minecraft.item.ArmorItem armor) {
+            EquipmentSlot slot = armor.getSlotType();
+            ItemStack currentArmor = npc.getEquippedStack(slot);
+            if (currentArmor.isEmpty()) {
+                npc.equipStack(slot, stack);
+                npc.sendMessage("Putting on armor.");
+            } else {
+                npc.getInventory().addStack(stack);
+            }
         } else {
             npc.getInventory().addStack(stack);
         }

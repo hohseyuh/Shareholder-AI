@@ -26,6 +26,7 @@ public class SimpleNpcEntity extends PathAwareEntity {
     // --- STATE ---
     private NpcJob currentJob = NpcJob.NONE;
     private MinerLevel minerClass = MinerLevel.APPRENTICE;
+    private BlockPos guardPost;
 
     // Logic Vars
     private PlayerEntity followTarget;
@@ -41,7 +42,7 @@ public class SimpleNpcEntity extends PathAwareEntity {
     // Inventory
     private final SimpleInventory inventory = new SimpleInventory(27);
 
-    private static final String[] RANDOM_NAMES = { "Cavid", "Elvin", "Ruslan" };
+    private static final String[] RANDOM_NAMES = { "Cavid", "Elvin", "Ruslan", "Qedim" };
 
     public SimpleNpcEntity(EntityType<? extends PathAwareEntity> entityType, World world) {
         super(entityType, world);
@@ -58,25 +59,27 @@ public class SimpleNpcEntity extends PathAwareEntity {
     protected void initGoals() {
         this.goalSelector.add(0, new SwimGoal(this));
 
-        // Priority 1: SAFETY (Run from Fire/Lava/Cactus)
-        this.goalSelector.add(1, new EscapeDangerGoal(this, 1.5));
+        // Priority 1: SMART DANGER AVOIDANCE (doesn't trigger during Guard combat)
+        this.goalSelector.add(1, new GuardEscapeDangerGoal(this, 1.5));
 
-        // Priority 2: SCAVENGING (Tools & Loot)
-        // Checks Job internally. Overrides Mining.
+        // Priority 2: COMBAT & SCAVENGING
+        this.goalSelector.add(2, new NpcMeleeAttackGoal(this, 1.2, false));
         this.goalSelector.add(2, new PickupItemGoal(this));
 
-        // Priority 3: WORK (Mining)
-        // Checks Job internally.
+        // Priority 3: JOBS
         this.goalSelector.add(3, new MiningGoal(this));
+        this.goalSelector.add(3, new GuardPatrolGoal(this, 1.0, 10.0f));
 
-        // Priority 4: FOLLOW (Loyalty)
-        // If not working or safe, follow player.
+        // Priority 4: FOLLOW
         this.goalSelector.add(4, new FollowPlayerGoal(this, 1.0, 3.0f, 6.0f));
 
         // Priority 5: IDLE
         this.goalSelector.add(5, new WanderAroundFarGoal(this, 1.0));
         this.goalSelector.add(6, new LookAtEntityGoal(this, PlayerEntity.class, 8.0f));
         this.goalSelector.add(7, new LookAroundGoal(this));
+
+        // TARGET SELECTOR
+        this.targetSelector.add(1, new GuardTargetGoal(this, 15.0f, 20));
     }
 
     // =============================================================
@@ -193,11 +196,27 @@ public class SimpleNpcEntity extends PathAwareEntity {
     // 4. GETTERS / SETTERS / BOILERPLATE
     // =============================================================
 
+    public void setGuardPost(BlockPos pos) {
+        this.guardPost = pos;
+    }
+
+    public BlockPos getGuardPost() {
+        return this.guardPost;
+    }
+
     public void setJob(NpcJob newJob) {
         this.currentJob = newJob;
         this.getNavigation().stop();
         this.sendMessage("Job changed to: " + newJob.name());
         this.isRequestingTool = false;
+
+        // If becoming a Guard, set the current spot as the post
+        if (newJob == NpcJob.GUARD) {
+            this.guardPost = this.getBlockPos();
+            this.sendMessage("I will guard this spot.");
+        } else {
+            this.guardPost = null;
+        }
     }
 
     public void promote() {
@@ -286,7 +305,8 @@ public class SimpleNpcEntity extends PathAwareEntity {
         return MobEntity.createMobAttributes()
                 .add(EntityAttributes.GENERIC_MAX_HEALTH, 20.0)
                 .add(EntityAttributes.GENERIC_MOVEMENT_SPEED, 0.3)
-                .add(EntityAttributes.GENERIC_ATTACK_DAMAGE, 1.0); // Fixes crash
+                .add(EntityAttributes.GENERIC_ATTACK_DAMAGE, 3.0)
+                .add(EntityAttributes.GENERIC_FOLLOW_RANGE, 32.0);
     }
 
     // =============================================================
@@ -298,6 +318,7 @@ public class SimpleNpcEntity extends PathAwareEntity {
         nbt.putString("MinerClass", this.minerClass.name());
         nbt.putString("CurrentJob", this.currentJob.name());
         nbt.putBoolean("IsRequestingTool", this.isRequestingTool);
+        nbt.putLong("GuardPost", this.guardPost.asLong());
 
         NbtList list = new NbtList();
         for (int i = 0; i < this.inventory.size(); ++i) {
@@ -309,6 +330,10 @@ public class SimpleNpcEntity extends PathAwareEntity {
             }
         }
         nbt.put("Inventory", list);
+
+        if (nbt.contains("GuardPost")) {
+            this.guardPost = BlockPos.fromLong(nbt.getLong("GuardPost"));
+        }
     }
 
     @Override
